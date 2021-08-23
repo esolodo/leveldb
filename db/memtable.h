@@ -71,7 +71,8 @@ class MemTable {
     explicit KeyComparator(const InternalKeyComparator& c) : comparator(c) {}
     int operator()(const char* a, const char* b) const;
   };
-
+  // SkipList的compare是需要解码后再做比较，所以传入KeyComparator，再insert时，
+  // SkipList所使用的Key为编码过后的字符
   typedef SkipList<const char*, KeyComparator> Table;
 
   ~MemTable();  // Private since only Unref() should be used to delete it

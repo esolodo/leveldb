@@ -85,7 +85,7 @@ class Block::Iter : public Iterator {
   uint32_t current_;
   uint32_t restart_index_;  // Index of restart block in which current_ falls
   std::string key_;
-  Slice value_;
+  Slice value_; // value_十分重要，保存value值的地址，value.data() - data_就为偏移
   Status status_;
 
   inline int Compare(const Slice& a, const Slice& b) const {
@@ -96,12 +96,12 @@ class Block::Iter : public Iterator {
   inline uint32_t NextEntryOffset() const {
     return (value_.data() + value_.size()) - data_;
   }
-
+  // 通过restart数组+偏移量找到block的起始位置
   uint32_t GetRestartPoint(uint32_t index) {
     assert(index < num_restarts_);
-    return DecodeFixed32(data_ + restarts_ + index * sizeof(uint32_t));
+    return DecodeFixed32(data_ + restarts_ + index * sizeof(uint32_t)); 
   }
-
+  // block的起始位置通过slice的data字段保存向上传递
   void SeekToRestartPoint(uint32_t index) {
     key_.clear();
     restart_index_ = index;
@@ -248,6 +248,7 @@ class Block::Iter : public Iterator {
   }
 
   bool ParseNextKey() {
+    // current为entry的偏移，但是这里感觉有点多余
     current_ = NextEntryOffset();
     const char* p = data_ + current_;
     const char* limit = data_ + restarts_;  // Restarts come right after data
@@ -265,8 +266,8 @@ class Block::Iter : public Iterator {
       CorruptionError();
       return false;
     } else {
-      key_.resize(shared);
-      key_.append(p, non_shared);
+      key_.resize(shared); // 这里是有序的所以使用resize可以保证shard字符串是在key当中
+      key_.append(p, non_shared); // 刚好在restart点的第一个key shared长度为0，key就直接会全部append到key_中去
       value_ = Slice(p + non_shared, value_length);
       while (restart_index_ + 1 < num_restarts_ &&
              GetRestartPoint(restart_index_ + 1) < current_) {
